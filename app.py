@@ -158,7 +158,7 @@ st.markdown("""
     <span class="badge">XGBoost</span>
     <span class="badge teal">HuggingFace</span>
     <span class="badge blue">OpenCV</span>
-    <span class="badge">PyTorch / TF</span>
+    <span class="badge">PyTorch</span>
     <span class="badge teal">Plotly</span>
     <span class="badge blue">Power BI</span>
   </div>
@@ -197,7 +197,7 @@ if tab_home.open:
         <div class="glow" style="--gc:rgba(139,92,246,0.5)"></div>
         <div class="icon"></div>
         <div class="title">Deep Learning</div>
-        <div class="desc">MobileNetV2, ResNet50, VGG16 classification. Grad-CAM, face/edge detection, image filters.</div>
+        <div class="desc">Classification, Grad-CAM, object and face detection, segmentation, and image filters.</div>
       </div>
       <div class="mod-card">
         <div class="glow" style="--gc:rgba(59,130,246,0.5)"></div>
