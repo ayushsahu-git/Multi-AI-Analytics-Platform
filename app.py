@@ -801,16 +801,16 @@ if tab_nlp.open:
     try:
         from models.nlp_module import (  # type: ignore[import]
             run_sentiment, run_ner, run_text_classification,
-            run_summarization, chat_with_model,
+            run_summarization,
         )
     except ImportError:
         from nlp_module import (  # type: ignore[import]
             run_sentiment, run_ner, run_text_classification,
-            run_summarization, chat_with_model,
+            run_summarization,
         )
 
     nlp_tabs = st.tabs(
-        [" Sentiment", " NER", " Classification", " Summarization", " Chatbot"],
+        [" Sentiment", " NER", " Classification", " Summarization"],
         on_change="rerun",
         key="nlp_views",
     )
@@ -928,56 +928,6 @@ if tab_nlp.open:
                 sc1, sc2 = st.columns(2)
                 sc1.metric("Original Words", len(long_txt.split()))
                 sc2.metric("Summary Words",  len(summary.split()))
-
-    # ── Chatbot ──
-    if nlp_tabs[4].open:
-        st.subheader(" AI Chatbot")
-        if "chat_pairs" not in st.session_state:
-            st.session_state.chat_pairs = []
-
-        with st.expander(" Settings"):
-            sys_hint = st.text_input("System hint:", value="You are a helpful AI assistant. Be concise.", max_chars=500)
-            if st.button(" Clear Chat"):
-                st.session_state.chat_pairs = []
-                st.rerun()
-
-        for um, bm in st.session_state.chat_pairs:
-            with st.chat_message("user"):
-                st.markdown(um)
-            with st.chat_message("assistant"):
-                st.markdown(bm)
-
-        user_input = st.chat_input("Ask anything…")
-        if user_input:
-            with st.chat_message("user"):
-                st.markdown(user_input)
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking…"):
-                    try:
-                        prompt = f"{sys_hint}\n\n{user_input}" if sys_hint else user_input
-                        resp   = chat_with_model(prompt, st.session_state.chat_pairs)
-                    except Exception:
-                        resp = "The chat service is temporarily unavailable. Try again later."
-                st.markdown(resp)
-            st.session_state.chat_pairs.append((user_input, resp))
-
-        if not st.session_state.chat_pairs:
-            examples = [
-                "What is machine learning?", "Explain neural networks simply.",
-                "Top 3 AI programming languages?", "Benefits of deep learning?",
-            ]
-            ecols = st.columns(2)
-            for i, ex in enumerate(examples):
-                with ecols[i % 2]:
-                    if st.button(ex, key=f"ex_{i}", width="stretch"):
-                        with st.spinner("Thinking…"):
-                            try:
-                                resp = chat_with_model(ex, [])
-                            except Exception:
-                                resp = "The chat service is temporarily unavailable. Try again later."
-                        st.session_state.chat_pairs.append((ex, resp))
-                        st.rerun()
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  TAB 6 · POWER BI

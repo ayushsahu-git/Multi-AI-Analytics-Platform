@@ -1,19 +1,3 @@
-# import os
-# from pathlib import Path
-
-# BASE_DIR = Path(__file__).parent
-# OUTPUT_DIR = BASE_DIR / "output"
-# OUTPUT_DIR.mkdir(exist_ok=True)
-
-# class Config:
-#     MODEL_CACHE_DIR = BASE_DIR / "model_cache"
-#     MAX_IMAGE_SIZE = (1024, 1024)
-#     BATCH_SIZE = 16
-#     DEFAULT_LLM_MODEL = "gemini-pro"
-#     DEFAULT_VISION_MODEL = "facebook/deit-base-patch16-224"
-#     DEFAULT_NLP_MODEL = "distilbert-base-uncased"
-
-
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent

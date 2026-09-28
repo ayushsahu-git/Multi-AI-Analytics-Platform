@@ -69,7 +69,7 @@ The app uses a dark, neutral interface with restrained accent colors.
 | Data | Upload, summary, statistics, and charts |
 | ML Pipeline | Model training and evaluation |
 | Deep Learning | Image classification and OpenCV tools |
-| NLP | Sentiment, entities, classification, summarization, and offline help |
+| NLP | Sentiment, entities, classification, and summarization |
 | Power BI | CSV and Parquet exports |
 
 ---
