@@ -489,309 +489,144 @@ if tab_ml.open:
 #  TAB 3 · DEEP LEARNING
 # ──────────────────────────────────────────────────────────────────────────────
 if tab_dl.open:
-    st.markdown('<div class="sec-head"> Deep Learning & Computer Vision</div>', unsafe_allow_html=True)
-
+    st.markdown('<div class="sec-head">Deep Learning & Computer Vision</div>', unsafe_allow_html=True)
+    st.write("Classify images, visualize model attention, detect objects or faces, segment scenes, or apply image filters.")
     from models.dl_module import (
-        _classify_image_tf, _classify_image_torch,
-        detect_edges_opencv, detect_faces_opencv, apply_image_filters,
+        apply_image_filters, classify_image, detect_edges, detect_faces,
+        detect_objects, gradcam_image, resize_for_analysis, segment_image,
     )
-
-    dl_uploaded = st.file_uploader("Upload Image (JPG / PNG)", type=["jpg", "jpeg", "png"], key="dl_up")
-
+    dl_uploaded = st.file_uploader(
+        "Choose an image (JPG, PNG, or WEBP)", type=["jpg", "jpeg", "png", "webp"],
+        key="dl_up", help="Maximum file size: 25 MB. Images are resized for faster analysis.",
+    )
     if dl_uploaded is None:
-        st.markdown('<div class="info-box"> Upload any image - try animals, faces, objects, or landscapes.</div>', unsafe_allow_html=True)
+        st.info("Choose an image to view it and use the analysis tools.")
+    elif dl_uploaded.size > MAX_UPLOAD_BYTES:
+        st.error("This image exceeds the 25 MB upload limit.")
     else:
-        if dl_uploaded.size > MAX_UPLOAD_BYTES:
-            st.error("Images must be 25 MB or smaller.")
-            st.stop()
+        import hashlib
+        import io
+        import warnings as _warnings
         try:
-            Image.open(dl_uploaded).verify()
-            dl_uploaded.seek(0)
-            pil_img = Image.open(dl_uploaded).convert("RGB")
+            with _warnings.catch_warnings():
+                _warnings.simplefilter("error", Image.DecompressionBombWarning)
+                image_bytes = dl_uploaded.getvalue()
+                raw_image = Image.open(io.BytesIO(image_bytes))
+                raw_image.verify()
+                raw_image = Image.open(io.BytesIO(image_bytes))
+                width, height = raw_image.size
+                if width < 1 or height < 1 or width * height > 16_000_000:
+                    raise ValueError("Image dimensions exceed the 16 megapixel limit.")
+                pil_img = raw_image.convert("RGB")
         except Exception:
-            st.error("Could not read this image. Choose a valid JPG or PNG file.")
-            st.stop()
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            st.image(pil_img, caption="Uploaded Image", width="stretch")
-        with c2:
-            w, h = pil_img.size
-            arr_np = np.array(pil_img.convert("RGB"))
-            for lbl, val in [
-                ("Resolution", f"{w}×{h}"),
-                ("Mode",       pil_img.mode),
-                ("Brightness", f"{arr_np.mean():.1f}"),
-                ("File size",  f"{dl_uploaded.size / 1024:.1f} KB"),
-            ]:
-                st.markdown(
-                    f'<div class="stat-card" style="margin-bottom:6px">'
-                    f'<div class="stat-val" style="font-size:1rem">{val}</div>'
-                    f'<div class="stat-lbl">{lbl}</div></div>',
-                    unsafe_allow_html=True,
+            st.error("This image could not be opened safely. Choose a valid image up to 16 megapixels.")
+        else:
+            image_key = hashlib.sha256(image_bytes).hexdigest()[:16]
+            analysis_image = resize_for_analysis(pil_img)
+            preview, details = st.columns([2, 1])
+            with preview:
+                st.image(analysis_image, caption="Image preview", width="stretch")
+            with details:
+                st.write(f"**Dimensions:** {width} × {height}")
+                st.write(f"**Format:** {raw_image.format or 'Image'}")
+                st.write(f"**Upload size:** {dl_uploaded.size / 1024:.1f} KB")
+                st.caption("Images are resized to at most 1,280 px per side.")
+            if "dl_results" not in st.session_state:
+                st.session_state.dl_results = {}
+
+            def _run_dl(cache_key, operation):
+                result_key = f"{image_key}:{cache_key}"
+                if result_key in st.session_state.dl_results:
+                    return st.session_state.dl_results[result_key]
+                try:
+                    result = operation()
+                    st.session_state.dl_results[result_key] = result
+                    while len(st.session_state.dl_results) > 8:
+                        st.session_state.dl_results.pop(next(iter(st.session_state.dl_results)))
+                    return result
+                except Exception:
+                    st.error("This analysis could not be completed. Check your connection and try again.")
+                    st.caption("Pretrained model weights may need to download the first time they are used.")
+                    return None
+
+            dl_tabs = st.tabs(
+                ["Classification", "Grad-CAM", "Detection", "Segmentation", "Filters"],
+                on_change="rerun", key="deep_learning_views",
+            )
+            if dl_tabs[0].open:
+                st.subheader("Image classification")
+                model_name = st.selectbox("Model", ["MobileNetV2", "ResNet50"], key="dl_cls_model")
+                if st.button("Classify image", type="primary", key="cls_btn"):
+                    with st.spinner("Classifying image. The first run may download model weights..."):
+                        result = _run_dl(f"classify:{model_name}", lambda: classify_image(analysis_image, model_name))
+                    if result:
+                        st.write(f"Top result: **{result[0]['Label']}** ({result[0]['Confidence']})")
+                        st.dataframe(pd.DataFrame(result), hide_index=True, width="stretch")
+            if dl_tabs[1].open:
+                st.subheader("Grad-CAM")
+                st.write("Highlights image regions that influenced the classifier's top prediction.")
+                model_name = st.selectbox("Model", ["MobileNetV2", "ResNet50"], key="dl_gc_model")
+                if st.button("Create heatmap", type="primary", key="gc_btn"):
+                    with st.spinner("Creating explanation..."):
+                        result = _run_dl(f"gradcam:{model_name}", lambda: gradcam_image(analysis_image, model_name))
+                    if result:
+                        overlay, prediction = result
+                        st.image(overlay, caption=f"Heatmap overlay · {prediction['Label']}", width="stretch")
+                        st.caption("Grad-CAM is an approximate visual explanation and may be inaccurate.")
+            if dl_tabs[2].open:
+                st.subheader("Detection")
+                task = st.selectbox(
+                    "Method", ["Face detection (OpenCV)", "Object detection (TorchVision)", "Edge detection (OpenCV)"],
+                    key="dl_detection_method",
                 )
-
-        st.markdown("---")
-        dl_tabs = st.tabs(
-            [" Classification", " Grad-CAM", " Detection", " Filters"],
-            on_change="rerun",
-            key="deep_learning_views",
-        )
-
-        if dl_tabs[0].open:
-            st.subheader("Image Classification - ImageNet 1K")
-            backend = st.radio("Backend", ["TensorFlow/Keras", "PyTorch"], horizontal=True)
-            if backend == "TensorFlow/Keras":
-                model_choice = st.selectbox("Model", ["MobileNetV2", "ResNet50", "VGG16"])
-            else:
-                model_choice = st.selectbox("Model", ["MobileNetV2", "ResNet50"])
-
-            if st.button(" Classify Image", type="primary", key="cls_btn"):
-                with st.spinner(f"Running {model_choice}…"):
-                    try:
-                        # Verify TF is importable before calling classify
-                        if backend == "TensorFlow/Keras":
-                            try:
-                                import tensorflow as _tf_check  # type: ignore[import-untyped]
-                            except ImportError:
-                                raise ImportError("TensorFlow not installed. Run: pip install tensorflow")
-                            results = _classify_image_tf(pil_img, model_choice)
-                        else:
-                            results = _classify_image_torch(pil_img, model_choice)
-
-                        import plotly.graph_objects as go
-                        st.markdown(
-                            f'<div class="success-box"> <strong>{results[0]["Label"]}</strong> - {results[0]["Confidence"]}</div>',
-                            unsafe_allow_html=True,
-                        )
-                        st.dataframe(pd.DataFrame(results), width="stretch")
-
-                        labels_list = [r["Label"][:28] for r in results]
-                        scores_list = [r["Score"] for r in results]
-                        colors_list = ["#a78bfa" if i == 0 else "#334155" for i in range(len(scores_list))]
-                        fig = go.Figure(go.Bar(
-                            x=scores_list[::-1], y=labels_list[::-1], orientation="h",
-                            marker=dict(color=colors_list[::-1]),
-                            text=[f"{s * 100:.1f}%" for s in scores_list[::-1]],
-                            textposition="outside",
-                        ))
-                        fig.update_layout(title="Top-5 Confidence Scores", template="plotly_dark",
-                                          paper_bgcolor="rgba(0,0,0,0)", height=280)
-                        st.plotly_chart(fig, width="stretch")
-                    except Exception:
-                        st.error("Image classification failed. Check the image and try again.")
-                        st.info("Make sure TensorFlow or PyTorch is installed.")
-
-        if dl_tabs[1].open:
-            st.subheader("Grad-CAM - Class Activation Heatmap")
-            st.markdown("Highlights **which image regions** the model focused on for its prediction.")
-
-            _tf_ok, _pt_ok = False, False
-            try:
-                import tensorflow; _tf_ok = True
-            except ImportError:
-                pass
-            try:
-                import torch; _pt_ok = True
-            except ImportError:
-                pass
-
-            if not _tf_ok and not _pt_ok:
-                st.markdown("""
-                <div class="info-box">
-                 Grad-CAM requires TensorFlow or PyTorch.<br>
-                Install: <code>pip install tensorflow</code> or <code>pip install torch torchvision</code>
-                </div>""", unsafe_allow_html=True)
-            else:
-                backend_opts = (["TensorFlow/Keras"] if _tf_ok else []) + (["PyTorch"] if _pt_ok else [])
-                gc_backend = st.radio("Backend", backend_opts, horizontal=True, key="gc_back")
-                gc_model   = st.selectbox(
-                    "Model",
-                    ["MobileNetV2", "ResNet50"] if gc_backend == "PyTorch" else ["MobileNetV2", "ResNet50", "VGG16"],
-                    key="gc_m",
-                )
-
-                if st.button(" Generate Grad-CAM", type="primary"):
-                    with st.spinner("Computing Grad-CAM…"):
-                        try:
-                            import cv2 as _cv
-                            import numpy as _np
-
-                            orig_224 = _np.array(pil_img.convert("RGB").resize((224, 224)))
-
-                            if gc_backend == "TensorFlow/Keras":
-                                # Robust TensorFlow import - handles tf2, tf-cpu, standalone keras
-                                try:
-                                    import tensorflow as tf  # type: ignore[import-untyped]
-                                except ImportError:
-                                    st.error(" TensorFlow not installed. Run: pip install tensorflow")
-                                    st.stop()
-                                try:
-                                    from tensorflow.keras.preprocessing.image import img_to_array  # type: ignore[import-untyped]
-                                except ImportError:
-                                    try:
-                                        from tensorflow.keras.utils import img_to_array  # type: ignore[import-untyped]
-                                    except ImportError:
-                                        from keras.utils import img_to_array  # type: ignore[import-untyped]
-                                try:
-                                    from models.dl_module import _load_tf_model
-                                except ImportError:
-                                    from dl_module import _load_tf_model  # type: ignore[import]
-
-                                model, preprocess, decode, (ih, iw) = _load_tf_model(gc_model)
-                                arr = preprocess(_np.expand_dims(img_to_array(
-                                    pil_img.convert("RGB").resize((iw, ih))), 0))
-
-                                layer_name = None
-                                try:
-                                    _conv2d_cls = tf.keras.layers.Conv2D  # type: ignore[attr-defined]
-                                except AttributeError:
-                                    import keras
-                                    _conv2d_cls = keras.layers.Conv2D  # type: ignore[attr-defined]
-                                for layer in reversed(model.layers):
-                                    if isinstance(layer, _conv2d_cls):
-                                        layer_name = layer.name
-                                        break
-
-                                if not layer_name:
-                                    st.warning("No Conv2D layer found in model.")
-                                    st.stop()
-
-                                grad_model = tf.keras.models.Model(
-                                    inputs=model.inputs,
-                                    outputs=[model.get_layer(layer_name).output, model.output],
-                                )
-                                with tf.GradientTape() as tape:
-                                    conv_out, preds = grad_model(arr)
-                                    top_cls = int(tf.argmax(preds[0]).numpy())  # type: ignore[union-attr]
-                                    loss = preds[:, top_cls]  # type: ignore[index]
-                                grads   = tape.gradient(loss, conv_out)
-                                pooled  = tf.reduce_mean(grads, axis=(0, 1, 2))
-                                heatmap = conv_out[0] @ pooled[..., tf.newaxis]
-                                heatmap = tf.squeeze(heatmap).numpy()
-                                top_label = decode(model.predict(arr, verbose=0), top=1)[0][0][1].replace("_", " ").title()
-
-                            else:  # PyTorch
-                                import torch
-                                import torchvision.models as M
-                                import torchvision.transforms as T
-                                import json, urllib.request
-
-                                pt_map = {"MobileNetV2": M.mobilenet_v2, "ResNet50": M.resnet50}
-                                pt_model = pt_map.get(gc_model, M.mobilenet_v2)(weights="DEFAULT")
-                                pt_model.eval()
-
-                                last_conv = None
-                                for name, m in pt_model.named_modules():
-                                    if isinstance(m, torch.nn.Conv2d):
-                                        last_conv = (name, m)
-
-                                if last_conv is None:
-                                    st.warning("No Conv2d layer found.")
-                                    st.stop()
-
-                                activations, gradients = [], []
-
-                                def _fwd_hook(mod, inp, out):
-                                    activations.clear(); activations.append(out.detach())
-
-                                def _bwd_hook(mod, grad_in, grad_out):
-                                    gradients.clear(); gradients.append(grad_out[0].detach())
-
-                                h1 = last_conv[1].register_forward_hook(_fwd_hook)
-                                h2 = last_conv[1].register_full_backward_hook(_bwd_hook)
-
-                                _transform = T.Compose([
-                                    T.Resize(256), T.CenterCrop(224), T.ToTensor(),
-                                    T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-                                ])
-                                _tf_raw = _transform(pil_img.convert("RGB"))
-                                tf_img = _tf_raw.unsqueeze(0)  # torch Tensor - ignore PIL Image complaint  # type: ignore[union-attr]
-                                tf_img.requires_grad_(True)
-
-                                output = pt_model(tf_img)
-                                top_cls_pt = output.argmax(dim=1).item()
-                                pt_model.zero_grad()
-                                output[0, top_cls_pt].backward()
-                                h1.remove(); h2.remove()
-
-                                act     = activations[0].squeeze()
-                                grad    = gradients[0].squeeze()
-                                weights = grad.mean(dim=(1, 2))
-                                heatmap = (weights[:, None, None] * act).sum(dim=0).numpy()
-                                heatmap = _np.maximum(heatmap, 0)
-
-                                try:
-                                    url = "https://raw.githubusercontent.com/anishathalye/imagenet-simple-labels/master/imagenet-simple-labels.json"
-                                    with urllib.request.urlopen(url, timeout=5) as r:
-                                        class_labels = json.load(r)
-                                    top_label = class_labels[top_cls_pt].replace("_", " ").title()
-                                except Exception:
-                                    top_label = f"Class {top_cls_pt}"
-
-                            # ── Render heatmap ──
-                            heatmap = heatmap / (heatmap.max() + 1e-8)
-                            h_res   = _cv.resize(heatmap, (224, 224))
-                            _h_uint8 = _np.array(255 * h_res, dtype=_np.uint8)
-                            h_col   = _cv.cvtColor(
-                                _cv.applyColorMap(_h_uint8, _cv.COLORMAP_JET),  # type: ignore[call-overload]
-                                _cv.COLOR_BGR2RGB,
-                            )
-                            overlay = _np.array(orig_224 * 0.6 + h_col * 0.4, dtype=_np.uint8)
-
-                            gc1, gc2, gc3 = st.columns(3)
-                            gc1.image(orig_224, caption="Original",  width="stretch")
-                            gc2.image(h_col,    caption="Heatmap",   width="stretch")
-                            gc3.image(overlay,  caption="Overlay",   width="stretch")
-                            st.markdown(
-                                f'<div class="success-box"> Top prediction: <strong>{top_label}</strong> '
-                                f'- red/yellow regions = highest model attention</div>',
-                                unsafe_allow_html=True,
-                            )
-
-                        except Exception:
-                            st.error("Image analysis failed. Check the selected model and image, then try again.")
-
-        if dl_tabs[2].open:
-            st.subheader("OpenCV Detection")
-            cv_task = st.selectbox("Task", ["Face Detection", "Edge Detection"])
-            t1 = t2 = None
-            if cv_task == "Edge Detection":
-                t1 = st.slider("Threshold 1", 10, 200, 50)
-                t2 = st.slider("Threshold 2", 50, 400, 150)
-
-            if st.button("▶ Run Detection", type="primary", key="det_btn"):
-                with st.spinner("Running OpenCV…"):
-                    if cv_task == "Edge Detection":
-                        import cv2 as _cv
-                        _t1: float = float(t1) if t1 is not None else 50.0
-                        _t2: float = float(t2) if t2 is not None else 150.0
-                        gray  = _cv.cvtColor(np.array(pil_img.convert("RGB")), _cv.COLOR_RGB2GRAY)
-                        edges = _cv.Canny(_cv.GaussianBlur(gray, (5, 5), 0), _t1, _t2)
-                        dc1, dc2 = st.columns(2)
-                        dc1.image(pil_img, caption="Original",       width="stretch")
-                        dc2.image(edges,   caption="Edges",           width="stretch", clamp=True)
-                        st.info(f"Edge pixels: **{np.sum(edges > 0):,}**")
-                    else:
-                        result_img, face_count = detect_faces_opencv(pil_img)
-                        dc1, dc2 = st.columns(2)
-                        dc1.image(pil_img,    caption="Original",    width="stretch")
-                        dc2.image(result_img, caption="Detections",  width="stretch")
-                        if face_count > 0:
-                            st.markdown(f'<div class="success-box"> Detected <strong>{face_count}</strong> face(s).</div>', unsafe_allow_html=True)
-                        else:
-                            st.warning("No faces detected. Try a clear frontal portrait.")
-
-        if dl_tabs[3].open:
-            st.subheader("Image Filters Gallery")
-            if st.button(" Apply All Filters", type="primary", key="flt_btn"):
-                with st.spinner("Applying filters…"):
-                    filters  = apply_image_filters(pil_img)
-                    cols_f   = st.columns(3)
-                    for i, (name, img) in enumerate(filters.items()):
-                        with cols_f[i % 3]:
-                            st.image(img, caption=name, width="stretch")
-
-
+                if task == "Edge detection (OpenCV)":
+                    col1, col2 = st.columns(2)
+                    lower = col1.slider("Lower threshold", 10, 200, 50, key="dl_edge1")
+                    upper = col2.slider("Upper threshold", 50, 400, 150, key="dl_edge2")
+                    if upper <= lower:
+                        st.warning("The upper threshold must be greater than the lower threshold.")
+                    elif st.button("Find edges", type="primary", key="edge_btn"):
+                        with st.spinner("Finding edges..."):
+                            result = _run_dl(f"edges:{lower}:{upper}", lambda: detect_edges(analysis_image, lower, upper))
+                        if result is not None:
+                            st.image(result, caption="Detected edges", clamp=True, width="stretch")
+                elif task == "Face detection (OpenCV)":
+                    if st.button("Find faces", type="primary", key="face_btn"):
+                        with st.spinner("Detecting faces..."):
+                            result = _run_dl("faces", lambda: detect_faces(analysis_image))
+                        if result:
+                            image, count = result
+                            st.image(image, caption="Face detection result", width="stretch")
+                            st.write(f"Faces found: {count}")
+                elif st.button("Detect objects", type="primary", key="objects_btn"):
+                    with st.spinner("Detecting objects. The first run may download model weights..."):
+                        result = _run_dl("objects", lambda: detect_objects(analysis_image))
+                    if result:
+                        image, objects = result
+                        st.image(image, caption="Object detection result", width="stretch")
+                        st.dataframe(pd.DataFrame(objects), hide_index=True, width="stretch") if objects else st.info("No objects met the confidence threshold.")
+            if dl_tabs[3].open:
+                st.subheader("Semantic segmentation")
+                st.write("Predicts common scene categories for image regions. Model weights may download on first use.")
+                if st.button("Segment image", type="primary", key="segment_btn"):
+                    with st.spinner("Segmenting image..."):
+                        result = _run_dl("segmentation", lambda: segment_image(analysis_image))
+                    if result:
+                        overlay, areas = result
+                        st.image(overlay, caption="Predicted scene regions", width="stretch")
+                        st.dataframe(pd.DataFrame(areas), hide_index=True, width="stretch")
+                        st.caption("Segmentation labels are model predictions and can be inaccurate.")
+            if dl_tabs[4].open:
+                st.subheader("Image filters")
+                st.write("Create grayscale, blur, sharpen, threshold, and contour views.")
+                if st.button("Apply filters", type="primary", key="flt_btn"):
+                    with st.spinner("Applying filters..."):
+                        result = _run_dl("filters", lambda: apply_image_filters(analysis_image))
+                    if result:
+                        columns = st.columns(2)
+                        for index, (name, filtered) in enumerate(result.items()):
+                            with columns[index % 2]:
+                                st.image(filtered, caption=name, width="stretch")
 # ──────────────────────────────────────────────────────────────────────────────
 #  TAB 4 · NLP
 # ──────────────────────────────────────────────────────────────────────────────
