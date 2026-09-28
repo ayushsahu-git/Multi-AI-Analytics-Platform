@@ -208,8 +208,8 @@ def render_dl_module():
                     plt.tight_layout()
                     st.pyplot(fig)
 
-                except Exception as e:
-                    st.error(f"Classification failed: {e}")
+                except Exception:
+                    st.error("Classification failed. Check the image and model setup, then try again.")
                     st.info("Make sure TensorFlow or PyTorch is installed. Run: `pip install tensorflow` or `pip install torch torchvision`")
 
     # ── Tab 2: OpenCV Analysis ────────────────────────────────────────────────

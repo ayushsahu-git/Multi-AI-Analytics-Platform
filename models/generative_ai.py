@@ -190,7 +190,7 @@ class GenerativeAI:
                 )
                 return response.content[0].text
             
-        except Exception as e:
-            return f"Error with {self.provider}: {str(e)}. Falling back to smart AI.\n\n" + _smart_respond(prompt, history or [])
+        except Exception:
+            return "The selected AI provider is temporarily unavailable. The local response mode will be used instead.\n\n" + _smart_respond(prompt, history or [])
         
         return _smart_respond(prompt, history or [])
