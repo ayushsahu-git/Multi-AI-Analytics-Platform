@@ -153,7 +153,7 @@ def apply_image_filters(image_pil):
 # ─── Streamlit UI ─────────────────────────────────────────────────────────────
 
 def render_dl_module():
-    st.header("🧠 Deep Learning Module")
+    st.header("Deep Learning Module")
     st.markdown("Upload an image to classify it with pretrained CNNs or run OpenCV computer vision pipelines.")
 
     uploaded = st.file_uploader("Upload Image (JPG/PNG)", type=["jpg", "jpeg", "png"], key="dl_upload")
@@ -165,7 +165,7 @@ def render_dl_module():
     image_pil = Image.open(uploaded)
     st.image(image_pil, caption="Uploaded Image", use_column_width=True)
 
-    tabs = st.tabs(["🏷️ Image Classification", "👁️ OpenCV Analysis", "🎨 Image Filters"])
+    tabs = st.tabs(["Image Classification", "OpenCV Analysis", "Image Filters"])
 
     # ── Tab 1: Classification ─────────────────────────────────────────────────
     with tabs[0]:
@@ -177,7 +177,7 @@ def render_dl_module():
         else:
             model_choice = st.selectbox("Model", ["MobileNetV2", "ResNet50"])
 
-        if st.button("🔍 Classify Image", type="primary"):
+        if st.button("Classify Image", type="primary"):
             with st.spinner(f"Running {model_choice} inference..."):
                 try:
                     if backend == "TensorFlow/Keras":
@@ -188,7 +188,7 @@ def render_dl_module():
                     import pandas as pd
                     import matplotlib.pyplot as plt
 
-                    st.success(f"✅ Top prediction: **{results[0]['Label']}** ({results[0]['Confidence']})")
+                    st.success(f"Top prediction: **{results[0]['Label']}** ({results[0]['Confidence']})")
                     st.subheader("Top 5 Predictions")
                     df_preds = pd.DataFrame(results)
                     st.dataframe(df_preds, use_container_width=True)
@@ -218,7 +218,7 @@ def render_dl_module():
 
         cv_task = st.selectbox("Select Analysis", ["Edge Detection", "Face Detection"])
 
-        if st.button("▶ Run OpenCV Analysis", type="primary"):
+        if st.button("Run OpenCV Analysis", type="primary"):
             with st.spinner("Processing with OpenCV..."):
                 if cv_task == "Edge Detection":
                     edges = detect_edges_opencv(image_pil)
@@ -237,14 +237,14 @@ def render_dl_module():
                     with col2:
                         st.image(result_img, caption="Face Detection", use_column_width=True)
                     if face_count > 0:
-                        st.success(f"✅ Detected **{face_count}** face(s).")
+                        st.success(f"Detected **{face_count}** face(s).")
                     else:
                         st.warning("No faces detected. Try a clear portrait photo.")
 
     # ── Tab 3: Image Filters ──────────────────────────────────────────────────
     with tabs[2]:
         st.subheader("OpenCV Image Processing Filters")
-        if st.button("🎨 Apply All Filters", type="primary"):
+        if st.button("Apply All Filters", type="primary"):
             with st.spinner("Applying filters..."):
                 filters = apply_image_filters(image_pil)
                 cols = st.columns(3)

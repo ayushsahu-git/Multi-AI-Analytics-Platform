@@ -5,7 +5,7 @@ Models:
   - spaCy en_core_web_sm → named entity recognition (~15 MB, auto-downloads)
   - TF-IDF              → zero-shot classification (no download)
   - Extractive          → summarization (no download)
-  - Smart AI (built-in)  → chatbot, zero downloads
+  - Offline help         → fixed responses, no provider calls
 """
 import warnings
 warnings.filterwarnings("ignore")
@@ -262,66 +262,33 @@ def run_summarization(text: str) -> str:
 
 
 def chat_with_model(prompt: str, history: list) -> str:
-    """
-    Instant chatbot using Smart AI — no model download, zero RAM.
-    Falls back to simple keyword responses if the import fails.
-    """
-    try:
-        import sys
-        from pathlib import Path
-        # Support both flat and models/ directory layouts
-        sys.path.insert(0, str(Path(__file__).parent))
-        sys.path.insert(0, str(Path(__file__).parent.parent))
-        from generative_ai import _smart_respond
-
-        # Convert (user, bot) tuple history to dict format
-        hist_dicts = []
-        for u, b in history[-4:]:
-            hist_dicts.append({"role": "user",      "content": u})
-            hist_dicts.append({"role": "assistant",  "content": b})
-
-        return _smart_respond(prompt, hist_dicts)
-
-    except Exception:
-        # Ultra-safe fallback if generative_ai import fails
-        p = prompt.lower()
-        if any(w in p for w in ["hello", "hi", "hey"]):
-            return "Hello! Ask me anything about ML, data science, or AI. 😊"
-        if "machine learning" in p or " ml " in p:
-            return (
-                "**Machine Learning** enables systems to learn patterns from data without "
-                "explicit programming. Types: Supervised, Unsupervised, Reinforcement. "
-                "Libraries: scikit-learn, XGBoost, LightGBM."
-            )
-        if "deep learning" in p or "neural" in p:
-            return (
-                "**Deep Learning** uses multi-layer neural networks to learn complex features. "
-                "Best for images (CNNs), sequences (Transformers), and unstructured data. "
-                "Frameworks: PyTorch, TensorFlow."
-            )
-        if "xgboost" in p or "gradient boosting" in p:
-            return (
-                "**XGBoost** builds trees sequentially, each correcting errors of the prior. "
-                "Key params: n_estimators, max_depth, learning_rate. Extremely fast and accurate."
-            )
-        if "overfitting" in p:
-            return (
-                "**Overfitting** = model memorises training noise, fails on new data. "
-                "Fixes: cross-validation, regularisation (L1/L2), dropout, more data, simpler model."
-            )
-        if "python" in p:
-            return (
-                "**Python** dominates AI/ML thanks to: NumPy, Pandas, scikit-learn, "
-                "PyTorch, TensorFlow, HuggingFace Transformers. "
-                "Use virtual environments to manage dependencies."
-            )
-        if "nlp" in p or "natural language" in p:
-            return (
-                "**NLP** (Natural Language Processing) enables machines to understand text. "
-                "Key tasks: sentiment, NER, classification, summarisation, translation. "
-                "Modern approach: HuggingFace Transformers (BERT, GPT, T5)."
-            )
+    """Return a local help response without contacting an AI provider."""
+    p = prompt.lower().strip()
+    if any(word in p for word in ("hello", "hi", "hey")):
+        return "Hello. Ask about machine learning, model evaluation, or NLP tools."
+    if "overfitting" in p:
         return (
-            "I'm your AI assistant. Try asking about: machine learning, neural networks, "
-            "XGBoost, overfitting, Python, NLP, or data science topics!"
+            "Overfitting happens when a model learns training noise and performs poorly on new data. "
+            "Try cross-validation, regularization, fewer features, or more training examples."
         )
+    if "xgboost" in p or "gradient boosting" in p:
+        return (
+            "Gradient boosting builds trees in sequence, with each tree correcting earlier errors. "
+            "XGBoost is one implementation; tune tree depth, learning rate, and estimator count."
+        )
+    if "deep learning" in p or "neural" in p:
+        return (
+            "Deep learning uses layered neural networks. Image models often use convolutional layers; "
+            "text models use sequence or attention-based architectures."
+        )
+    if "machine learning" in p or " ml " in f" {p} ":
+        return (
+            "Machine learning fits patterns from examples. Start by choosing a target column, "
+            "splitting data into training and test sets, and comparing suitable models."
+        )
+    if "nlp" in p or "natural language" in p:
+        return "NLP tools in this app cover sentiment, entity extraction, text classification, and summarization."
+    return (
+        "This is an offline help panel with fixed topic responses. Try asking about machine learning, "
+        "XGBoost, overfitting, deep learning, or NLP."
+    )
