@@ -22,7 +22,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Open → **https://huggingface.co/spaces/ayushsahu45/Multi-AI-Analytics-Platform**
+Open → **https://multi-ai-analytics-platform-sl68.onrender.com**
 
 ---
 
