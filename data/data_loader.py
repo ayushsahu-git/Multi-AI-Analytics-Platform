@@ -187,8 +187,8 @@ class DataLoader:
                 try:
                     img = Image.open(file_path).convert('RGB')
                     images.append((str(file_path), img))
-                except Exception as e:
-                    print(f"Error loading {file_path}: {e}")
+                except Exception:
+                    continue
         return images
 
     def load_text_file(self, file_path: Union[str, Path]) -> str:

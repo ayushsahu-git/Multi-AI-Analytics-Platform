@@ -161,6 +161,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, Any, List, Union, Optional
 import json
+import re
 from datetime import datetime
 
 
@@ -170,13 +171,20 @@ class PowerBIExporter:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.exported_files: List[Path] = []
 
+    @staticmethod
+    def _validate_filename(filename: str) -> None:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", filename):
+            raise ValueError("Invalid export name")
+
     def export_to_csv(self, df: pd.DataFrame, filename: str) -> Path:
+        self._validate_filename(filename)
         output_path = self.output_dir / f"{filename}.csv"
         df.to_csv(output_path, index=False)
         self.exported_files.append(output_path)
         return output_path
 
     def export_to_parquet(self, df: pd.DataFrame, filename: str) -> Path:
+        self._validate_filename(filename)
         try:
             import pyarrow  # noqa
             output_path = self.output_dir / f"{filename}.parquet"
@@ -188,6 +196,7 @@ class PowerBIExporter:
             return self.export_to_csv(df, filename + "_parquet_fallback")
 
     def export_to_json(self, data: Any, filename: str) -> Path:
+        self._validate_filename(filename)
         output_path = self.output_dir / f"{filename}.json"
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, default=str)
