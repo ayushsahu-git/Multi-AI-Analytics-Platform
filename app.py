@@ -1424,6 +1424,7 @@ import os
 import sys
 import json
 import re
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any, Optional
 
@@ -1568,19 +1569,18 @@ with st.sidebar:
     st.divider()
 
     st.markdown("###  System Status")
-    for lib, label in [
+    for distribution, label in [
         ("torch", "PyTorch"),
-        ("sklearn", "scikit-learn"),
+        ("scikit-learn", "scikit-learn"),
         ("xgboost", "XGBoost"),
         ("transformers", "Transformers"),
-        ("cv2", "OpenCV"),
+        ("opencv-python-headless", "OpenCV"),
         ("lightgbm", "LightGBM"),
     ]:
         try:
-            mod = __import__(lib)
-            ver = getattr(mod, "__version__", "available")
+            ver = importlib_metadata.version(distribution)
             st.markdown(f"{label}: `{ver}`")
-        except ImportError:
+        except importlib_metadata.PackageNotFoundError:
             st.markdown(f"{label}: unavailable")
     st.divider()
 
